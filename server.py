@@ -13,7 +13,7 @@ group2 = []
 group1_score = 0
 group2_score = 0
 
-def start_udp_server(port):
+def start_udp_server(ip_address, port):
     """
     create and return UDP socket for broadcasting
     """
@@ -22,19 +22,19 @@ def start_udp_server(port):
     UDPserverSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
     UDPserverSocket.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
     UDPserverSocket.settimeout(0.2)
-    print('listening on IP address ' + 'localhost')
+    print('listening on IP address ' + ip_address)
     return UDPserverSocket
 
 
-def start_tcp_server(port):
+def start_tcp_server(ip_address, port):
     """
     create and return a TCP socket
     """
     print('starting tcp server')
     TCPServerSocket = socket(AF_INET, SOCK_STREAM)
-    TCPServerSocket.bind(("localhost", port))
+    TCPServerSocket.bind((ip_address, port))
     TCPServerSocket.settimeout(10)
-    TCPServerSocket.listen(10)
+    TCPServerSocket.listen()
     return TCPServerSocket
 
 
@@ -46,9 +46,9 @@ def accept_clients(socket):
     while time.time() < timer:
         try:
             clientSocket, clientAddress = socket.accept()
-            team_name = clientSocket.recv(1024).decode()
+            team_name = clientSocket.recv(1024).decode('utf-8')
             if team_name and clientSocket:
-                print('client: ' + team_name)
+                print(team_name[:len(team_name) - 1] + ' has joined')
                 clients[team_name] = clientSocket
                 assign_group(team_name)
         except:
@@ -61,10 +61,10 @@ def assign_group(team_name):
     """
     n = random.randint(1, 3)
     if n == 1:
-        print('added ' + team_name + ' to group 1')
+        print(team_name[:len(team_name) - 1] + ' was added to group 1')
         group1.append(team_name)
     else:
-        print('added ' + team_name + ' to group 2')
+        print(team_name[:len(team_name) - 1] + ' was added to group 2')
         group2.append(team_name)
 
 
@@ -93,11 +93,9 @@ def generate_welcome_message():
 
 
 def listen_to_your_client(socket, limit):
-    print('Listening to your client for ' + str(limit - time.time()) + ' seconds')
     counter = 0
     while time.time() < limit:
         socket.recv(28)
-        print('X')
         counter += 1
     print('Done listening to your client. ' + str(counter))
     return counter
@@ -108,6 +106,7 @@ def start_game():
     global group2_score
     print('Game started!')
     welcome_message = generate_welcome_message()
+    print(welcome_message)
     decoded = welcome_message.encode()
     time_limit = time.time() + 10
     with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -121,21 +120,68 @@ def start_game():
                 group2_score += c
 
 
-udpServerPort = 13117
-tcpServerPort = 2099
+def calculate_winners_message():
+    global group1_score
+    global group2_score
+    msg = '====================\nGame over!\n'
+    if group1_score > group2_score:
+        winner = 'Group 1'
+        score = group1_score
+    else:
+        winner = 'Group 2'
+        score = group2_score
+    msg += 'Group 1 typed in ' + str(group1_score) + ' characters. Group 2 typed in ' + str(group2_score) + ' characters.\n'
+    msg += winner + ' wins!\n\n'
+    msg += 'Congratulations to the winners:\n==\n'
+    if winner == 'Group 1':
+        for team in group1:
+            msg += team
+    if winner == 'Group 2':
+        for team in group2:
+            msg += team + '======================\n'
+    return msg        
 
-udpServerSocket = start_udp_server(udpServerPort)
-tcpServerSocket = start_tcp_server(tcpServerPort)
 
-t1 = threading.Thread(target=broadcast_announcements, args=(udpServerSocket, udpServerPort, tcpServerPort, ))
-t2 = threading.Thread(target=accept_clients, args=(tcpServerSocket, ))
+def send_results_to_clients():
+    results_msg = calculate_winners_message()
+    print(results_msg)
+    for team in clients:
+        clients[team].send(results_msg.encode())
 
-t1.start()  # broadcast announcements
-t2.start()  # accepting clients and assigning groups
-t1.join()
-t2.join()
 
-t3 = threading.Thread(target=start_game())
-t3.start()
+def run_server():
+    global clients
+    global group1
+    global group2
+    global group1_score
+    global group2_score
 
-print('Group 1: ' + str(group1_score) + '. Group 2: ' + str(group2_score))
+    ip_address = '192.168.0.42'
+    udpServerPort = 13117
+    tcpServerPort = 2099
+
+    udpServerSocket = start_udp_server(ip_address, udpServerPort)
+    tcpServerSocket = start_tcp_server(ip_address, tcpServerPort)
+
+    t1 = threading.Thread(target=broadcast_announcements, args=(udpServerSocket, udpServerPort, tcpServerPort, ))
+    t2 = threading.Thread(target=accept_clients, args=(tcpServerSocket, ))
+
+    t1.start()  # broadcast announcements
+    t2.start()  # accepting clients and assigning groups
+    t1.join()
+    t2.join()
+
+    t3 = threading.Thread(target=start_game())
+    t3.start()
+    t3.join()
+
+    send_results_to_clients()
+
+    clients = {}
+    group1 = []
+    group2 = []
+    group1_score = 0
+    group2_score = 0
+
+while True:
+    run_server()

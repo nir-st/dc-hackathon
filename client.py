@@ -30,8 +30,8 @@ def createTcpSocket(server_ip, port, team_name):
     create TCP socket
     """
     TCPclientSocket = socket(AF_INET, SOCK_STREAM)
-    TCPclientSocket.connect(("localhost", port))
-    TCPclientSocket.send((team_name +  '\n').encode())
+    TCPclientSocket.connect((server_ip, port))
+    TCPclientSocket.send((team_name +  '\n').encode('utf-8'))
     message = TCPclientSocket.recv(1024).decode()
     print(message)
     return TCPclientSocket
@@ -42,12 +42,15 @@ def collectChars(socket):
     while time.time() < limit:
         c = msvcrt.getch()
         socket.send(c)
+    winners = socket.recv(2048)
+    print(winners.decode())
 
 
 team_name = 'smelly_cat'
 serverPort = 13117
 
 while True:
+    time.sleep(0.5)
     serverAns = startUdpSocket(serverPort)
     if serverAns != False:
         serverIp = serverAns[0]
