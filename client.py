@@ -1,6 +1,8 @@
 from socket import *
 import scapy
 import struct
+import msvcrt
+import time
 
 
 def startUdpSocket(port):
@@ -30,6 +32,16 @@ def createTcpSocket(server_ip, port, team_name):
     TCPclientSocket = socket(AF_INET, SOCK_STREAM)
     TCPclientSocket.connect(("localhost", port))
     TCPclientSocket.send((team_name +  '\n').encode())
+    message = TCPclientSocket.recv(1024).decode()
+    print(message)
+    return TCPclientSocket
+
+
+def collectChars(socket):
+    limit = time.time() + 10
+    while time.time() < limit:
+        c = msvcrt.getch()
+        socket.send(c)
 
 
 team_name = 'smelly_cat'
@@ -40,4 +52,5 @@ while True:
     if serverAns != False:
         serverIp = serverAns[0]
         tcpServerPort = serverAns[1]
-        createTcpSocket(serverIp, tcpServerPort, team_name)
+        tcpSocket = createTcpSocket(serverIp, tcpServerPort, team_name)
+        collectChars(tcpSocket)
