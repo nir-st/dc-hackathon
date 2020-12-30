@@ -1,10 +1,11 @@
 from socket import *
-import scapy
+# import scapy
 import time
 import struct
 import threading
 import random
 import concurrent.futures
+
 
 ### GLOBALS ###
 clients = {}  # dictionary. {team_name: clientSocket}
@@ -46,7 +47,7 @@ def accept_clients(socket):
     while time.time() < timer:
         try:
             clientSocket, clientAddress = socket.accept()
-            team_name = clientSocket.recv(1024).decode('utf-8')
+            team_name = clientSocket.recv(1024).decode()
             if team_name and clientSocket:
                 print(team_name[:len(team_name) - 1] + ' has joined')
                 clients[team_name] = clientSocket
@@ -81,6 +82,9 @@ def broadcast_announcements(socket, udp_port, tcp_port):
 
 
 def generate_welcome_message():
+    """
+    generate a welcoe message to send to the clients
+    """
     welcome_message = 'Welcome to Keyboard Spammers!\n'
     welcome_message += 'Group 1:\n==\n'
     for team in group1:
@@ -92,16 +96,28 @@ def generate_welcome_message():
     return welcome_message
 
 
-def listen_to_your_client(socket, limit):
+def listen_to_your_client(team_name, socket, limit):
+    """
+    
+    """
+    print('listening to team ' + team_name)
+    socket.settimeout(0.5)
     counter = 0
     while time.time() < limit:
-        socket.recv(28)
-        counter += 1
-    print('Done listening to your client. ' + str(counter))
+        try:
+            c = socket.recv(28)
+            if c:
+                counter += 1
+        except:
+            pass
+    print('Done listening to ' + team_name)
     return counter
 
 
 def start_game():
+    """
+    start a game
+    """
     global group1_score
     global group2_score
     print('Game started!')
@@ -111,8 +127,9 @@ def start_game():
     time_limit = time.time() + 10
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for team in clients:
+            print('sending start message to team ' + team)
             clients[team].send(decoded)
-            t = executor.submit(listen_to_your_client, clients[team], time_limit)
+            t = executor.submit(listen_to_your_client, team, clients[team], time_limit)
             c = t.result()
             if team in group1:
                 group1_score += c
@@ -121,15 +138,17 @@ def start_game():
 
 
 def calculate_winners_message():
+    """
+    generate and return winners message at the end of a game
+    """
     global group1_score
     global group2_score
+    print('generating result message')
     msg = '====================\nGame over!\n'
     if group1_score > group2_score:
         winner = 'Group 1'
-        score = group1_score
     else:
         winner = 'Group 2'
-        score = group2_score
     msg += 'Group 1 typed in ' + str(group1_score) + ' characters. Group 2 typed in ' + str(group2_score) + ' characters.\n'
     msg += winner + ' wins!\n\n'
     msg += 'Congratulations to the winners:\n==\n'
@@ -143,9 +162,13 @@ def calculate_winners_message():
 
 
 def send_results_to_clients():
+    """
+    send results message to all clients at the end of a game
+    """
     results_msg = calculate_winners_message()
     print(results_msg)
     for team in clients:
+        print('sending result message to team ' + team[:len(team)-1])
         clients[team].send(results_msg.encode())
 
 
@@ -156,7 +179,7 @@ def run_server():
     global group1_score
     global group2_score
 
-    ip_address = '192.168.0.42'
+    ip_address = 'localhost'  # IP ADDRESS OF SERVER
     udpServerPort = 13117
     tcpServerPort = 2099
 
