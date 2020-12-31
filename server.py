@@ -1,5 +1,4 @@
 from socket import *
-# import scapy
 import time
 import struct
 import threading
@@ -13,6 +12,8 @@ group1 = []
 group2 = []
 group1_score = 0
 group2_score = 0
+BUFFER_SIZE = 1024
+
 
 def start_udp_server(ip_address, port):
     """
@@ -43,11 +44,12 @@ def accept_clients(socket):
     """
     accept clients
     """
+    global BUFFER_SIZE
     timer = time.time() + 10
     while time.time() < timer:
         try:
             clientSocket, clientAddress = socket.accept()
-            team_name = clientSocket.recv(1024).decode()
+            team_name = clientSocket.recv(BUFFER_SIZE).decode()
             if team_name and clientSocket:
                 print(team_name[:len(team_name) - 1] + ' has joined')
                 clients[team_name] = clientSocket
@@ -98,14 +100,16 @@ def generate_welcome_message():
 
 def listen_to_your_client(team_name, socket, limit):
     """
-    
+    recive keyboard hits from a client socket for 10 seconds
+    return the number of keyboard hits
     """
+    global BUFFER_SIZE
     print('listening to team ' + team_name)
     socket.settimeout(0.5)
     counter = 0
     while time.time() < limit:
         try:
-            c = socket.recv(28)
+            c = socket.recv(BUFFER_SIZE)
             if c:
                 counter += 1
         except:
@@ -168,8 +172,11 @@ def send_results_to_clients():
     results_msg = calculate_winners_message()
     print(results_msg)
     for team in clients:
-        print('sending result message to team ' + team[:len(team)-1])
-        clients[team].send(results_msg.encode())
+        try:
+            print('sending result message to team ' + team[:len(team)-1])
+            clients[team].send(results_msg.encode())
+        except:
+            pass
 
 
 def run_server():
@@ -180,8 +187,8 @@ def run_server():
     global group2_score
 
     ip_address = 'localhost'  # IP ADDRESS OF SERVER
-    udpServerPort = 13117
-    tcpServerPort = 2099
+    udpServerPort = 13117     # UDP Port Number
+    tcpServerPort = 2099      # TCP Port Number
 
     udpServerSocket = start_udp_server(ip_address, udpServerPort)
     tcpServerSocket = start_tcp_server(ip_address, tcpServerPort)
@@ -205,6 +212,7 @@ def run_server():
     group2 = []
     group1_score = 0
     group2_score = 0
+
 
 while True:
     run_server()
